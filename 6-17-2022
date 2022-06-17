@@ -1,0 +1,50 @@
+install.packages("tidyverse")
+install.packages("lubridate") 
+install.packages("janitor") 
+install.packages("dplyr") 
+install.packages("ggplot2") 
+library(tidyverse)
+library(lubridate) 
+library(janitor) 
+library(dplyr) 
+library(ggplot2)
+daily_activity <- read.csv("Fitabase Data 4.12.16-5.12.16/dailyActivity_merged.csv")
+daily_calories <- read.csv("Fitabase Data 4.12.16-5.12.16/dailyCalories_merged.csv")
+daily_sleep <- read.csv("Fitabase Data 4.12.16-5.12.16/sleepDay_merged.csv")
+daily_steps <- read.csv("Fitabase Data 4.12.16-5.12.16/dailySteps_merged.csv")
+weight_log <- read.csv("Fitabase Data 4.12.16-5.12.16/weightLogInfo_merged.csv")
+count(distinct(daily_activity, Id))
+count(distinct(weight_log, Id))
+# make the date format consistent for both daily_activity and data_sleep 
+# also need to rename both of their columns to "date"
+# Having a same column name would make merging/joining data easier
+daily_activity$ActivityDate <- as.Date.character(daily_activity$ActivityDate, format="%d/%m/%Y")
+daily_sleep$SleepDay <- as.Date.character(daily_sleep$SleepDay, format="%d/%m/%Y")
+head(daily_activity)
+head(daily_sleep)
+# add a variable to see how many minutes it would take a user from lying in bed to actually sleeping.
+daily_sleep <- transform(daily_sleep, BedToSleepMinutes = TotalTimeInBed - TotalMinutesAsleep)
+head(daily_sleep)
+# Rename both of their Date column to "date" in preparation for joining the table
+daily_sleep <- rename(daily_sleep, date = SleepDay)
+daily_activity <- rename(daily_activity, date = ActivityDate)
+# merge the sleep and activity table using Id and date as reference
+merged_daily_activity <- merge(x = daily_activity, y = daily_sleep, by=c("Id","date"), all.x = TRUE)
+head(merged_daily_activity)
+# To gain insight into customer behavior per day of the week, I added a "Weekday" column
+# I can then do an analysis that is summarized per weekday
+merged_daily_activity <- transform(merged_daily_activity, Weekday=weekdays(date))
+head(merged_daily_activity)
+# removed the TrackerDistance because it is redundant with TotalDistance
+data_correlation <- select(merged_daily_activity, Calories, TotalSteps:SedentaryMinutes, -TrackerDistance)
+# creating the table to use for correlation, contains numerical values only
+data_corr_w_sleep <- select(merged_daily_activity,Calories, TotalSteps:BedToSleepMinutes, -TrackerDistance) %>% filter(!is.na(BedToSleepMinutes))
+# correlation function ; the default correlation method is Pearson Correlation
+cor(data_correlation)
+# dropping the observations with "NA" on sleep data affected the correlation coefficient
+cor(data_corr_w_sleep)
+# install corrplot and then visualize the two tables 
+install.packages("factoextra")
+library(corrplot)
+corrplot(cor(data_correlation))
+corrplot(cor(data_corr_w_sleep))
